@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import soundfile as sf
 import soxr
 from speaker_embed import *
@@ -33,24 +34,6 @@ test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
 model = model.to(device)
 
-'''
-num_errors = 0
-for i, (x, y) in tqdm(enumerate(test_dataloader)):
-    x = x.to(device)
-    y = y.to(device)
-    pred = model(x)
-    print(pred)
-    pred = torch.argmax(pred, dim=1)
-    y = torch.argmax(y, dim=1)
-    for k in range(len(pred)):
-        if pred[k] != y[k]:
-            num_errors += 1
-acc = 1 - num_errors / len(test_dataset)
-acc = float("%.4f" % acc)
-print(f'Number of errors: {num_errors}')
-print(f'Test Accuracy: {acc}')
-'''
-
 def predict(x, model):
     x = x.to(device)
     model = model.to(device)
@@ -60,16 +43,14 @@ def predict(x, model):
 
 # x: (batch_size, 1024) y: (batch_size, 20)
 x, y = next(iter(test_dataloader))
-'''
+x = x.to(device)
+y = y.to(device)
 pred = predict(x[0], model)
 
-explainer = LimeTextExplainer(class_names=dataset.speaker_to_label.keys())
-explanation = explainer.explain_instance(x[0], 
-                                         predict, # classification function
-                                         num_features=6, 
-                                         labels=[0, 1]
-                                         )    
+to_explain = x[[0, 1]]
+explainer = shap.GradientExplainer(model, x, batch_size=32, local_smoothing=0)
 
-print(explanation)
-'''
-
+shap_values = explainer.shap_values(x, ranked_outputs=None)
+print(len(shap_values), shap_values[0].shape)
+shap_values = np.array(shap_values)
+np.save('./explanations/shap_gradient_0_1.npy', shap_values)
